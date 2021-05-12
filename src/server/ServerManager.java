@@ -73,6 +73,7 @@ public class ServerManager {
                     break;
                 case HELP:
                     this.listCommands(receivePacket.getAddress(), receivePacket.getPort());
+
                     break;
                 case END:
                     this.endClientConnection(receivePacket.getAddress(), receivePacket.getPort());
@@ -177,7 +178,17 @@ public class ServerManager {
     }
 
     private void listCommands(InetAddress IPAddress, int port) throws IOException {
-        this.sendMessage(Arrays.toString(Commands.values()), IPAddress, port);
+        StringBuilder sb = new StringBuilder("LISTA DE COMANDOS: \n\n");
+        sb.append("CREATE_ROOM [name] – cria uma room;\n");
+        sb.append("CREATE_CLIENT [name] – criar  usuário;\n");
+        sb.append("LST_ROOMS – lista os rooms do server;\n");
+        sb.append("ENTER_ROOM [name] – entra na room;\n");
+        sb.append(" PV [receiver] [message] – manda mensagem privada;\n");
+        sb.append("CURRENT_ROOM – lista room atual;\n");
+        sb.append("HELP – lista os comandos;\n");
+        sb.append("END – encerra participação do usuário no servidor;\n");
+        sb.append("IMG [path] – envia imagem;\n");
+        this.sendMessage(sb.toString(), IPAddress, port);
     }
 
     private void endClientConnection(InetAddress IPAddress, int port) throws IOException {
