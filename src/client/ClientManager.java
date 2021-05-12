@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Scanner;
 
 public class ClientManager {
@@ -30,7 +32,18 @@ public class ClientManager {
         while (true) {
             // lê uma linha do teclado
             String sentence = this.scanner.nextLine();
-            byte[] sendData = sentence.getBytes();
+            byte[] sendData;
+            if (sentence.startsWith("::img")) {
+                String[] splitData = sentence.split(" ");
+                String path = splitData[1];
+                byte[] fileBytes = Files.readAllBytes(Paths.get(path));
+                byte[] commandBytes = "::img ".getBytes();
+                sendData = new byte[commandBytes.length + fileBytes.length];
+                System.arraycopy(commandBytes, 0, sendData, 0, commandBytes.length);
+                System.arraycopy(fileBytes, 0, sendData, commandBytes.length, fileBytes.length);
+            } else {
+                sendData = sentence.getBytes();
+            }
 
             // cria pacote com o dado, o endereço do server e porta do servidor
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, 9880);

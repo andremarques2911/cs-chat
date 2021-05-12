@@ -1,13 +1,18 @@
 package client;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class MulticastReceiver extends Thread {
     private int port;
     protected MulticastSocket socket = null;
-    protected byte[] buf = new byte[256];
+    protected byte[] buf = new byte[20000];
 
     public MulticastReceiver(int port) {
         this.port = port;
@@ -15,7 +20,7 @@ public class MulticastReceiver extends Thread {
 
     public void run() {
         try {
-            socket = new MulticastSocket(this.port);
+            this.socket = new MulticastSocket(this.port);
             InetAddress group = InetAddress.getByName("230.0.0.0");
             socket.joinGroup(group);
             while (true) {
@@ -26,8 +31,28 @@ public class MulticastReceiver extends Thread {
                     System.out.println("Servidor interrompeu a conexão.");
                     System.exit(1);
                     break;
+                } else if (received.startsWith("::img")) {
+                    String[] splitData = received.split("::img");
+                    String image = splitData[1];
+                    byte[] fileBytes = image.getBytes();
+//                    byte[] fileBytes = new byte[image.length()];
+//                    System.arraycopy(image, 0, fileBytes, 0, image.length());
+
+//                    File file = new File("/src/images/"+this.port+"/image.PNG");
+//                    if (!file.exists()) {
+                        //Creating the directory
+//                        boolean bool = file.mkdir();
+//                    }
+                    Path path = Paths.get("/src/images/"+this.port+"/image.PNG");
+                    Files.createDirectories(path.getParent());
+
+                    Files.write(path, fileBytes);
+//                    FileOutputStream in = new FileOutputStream(file);
+//                    in.write(fileBytes);
+//                    in.close();
+                    break;
                 }
-                // exibe mensagens do servidor para todos
+                // exibe mensagens do servidor para todos da sala
                 System.out.println(received);
             }
             socket.leaveGroup(group);

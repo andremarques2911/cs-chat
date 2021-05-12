@@ -40,7 +40,7 @@ public class ServerManager {
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
             // recebe o pacote do cliente
-            serverSocket.receive(receivePacket);
+            this.serverSocket.receive(receivePacket);
 
             // pega mensagem enviada pelo cliente
             String sentence = new String(receivePacket.getData(), 0, receivePacket.getLength());
@@ -79,6 +79,9 @@ public class ServerManager {
                     break;
                 case CURRENT_ROOM:
                     this.showCurrentRoom(receivePacket.getAddress(), receivePacket.getPort());
+                    break;
+                case IMG:
+                    this.sendImageToRoom(param, receivePacket.getAddress(), receivePacket.getPort());
                 case BLOCK:
                     break;
                 case DEFAULT:
@@ -192,6 +195,14 @@ public class ServerManager {
         Room room = this.getRoomByMulticastPort(client.getMulticastPort(), IPAddress, port);
         if (room == null) return;
         this.sendMessage("Servidor [privado]: Sua sala atual é " + room.getName(), IPAddress, port);
+    }
+
+    private void sendImageToRoom(String message, InetAddress IPAddress, int port) throws IOException {
+        Client client = this.getClientByPort(IPAddress, port);
+        if (client == null) return;
+        Room room = this.getRoomByMulticastPort(client.getMulticastPort(), client.getIPAddress(), client.getPort());
+        if (room == null) return;
+        room.getMulticastPublisher().multicast("::img " + message);
     }
 
     private void sendDefaultMulticastMessage(String message, InetAddress IPAddress, int port) throws IOException {

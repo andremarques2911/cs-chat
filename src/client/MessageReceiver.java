@@ -20,7 +20,7 @@ public class MessageReceiver extends Thread {
     public void run() {
         while(true) {
             try {
-                byte[] data = new byte[1024];
+                byte[] data = new byte[20000];
                 DatagramPacket receivedPacket = new DatagramPacket(data, data.length);
                 this.datagramSocket.receive(receivedPacket);
                 String message = new String(receivedPacket.getData(), 0, receivedPacket.getLength());

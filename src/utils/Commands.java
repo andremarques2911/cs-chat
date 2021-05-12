@@ -10,6 +10,7 @@ public enum Commands {
     HELP("::HELP"),
     END("::END"),
     CURRENT_ROOM("::CURRENT_ROOM"),
+    IMG("::IMG"),
     BLOCK("::BLOCK"),
     DEFAULT(null);
 
