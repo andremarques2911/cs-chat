@@ -1,14 +1,15 @@
 package utils;
 
 public enum Commands {
-    CREATE_SERVER("::CREATE_SERVER"),
+    CREATE_ROOM("::CREATE_ROOM"),
     CREATE_CLIENT("::CREATE_CLIENT"),
-    LST_SERVERS("::LST_SERVERS"),
+    LST_ROOMS("::LST_ROOMS"),
     LST_CLIENTS("::LST_CLIENTS"),
-    ENTER_SERVER("::ENTER_SERVER"),
+    ENTER_ROOM("::ENTER_ROOM"),
     PV("::PV"),
     HELP("::HELP"),
     END("::END"),
+    CURRENT_ROOM("::CURRENT_ROOM"),
     BLOCK("::BLOCK"),
     DEFAULT(null);
 

@@ -1,5 +1,6 @@
 package server;
 
+import room.Room;
 import utils.Commands;
 
 import java.io.IOException;
@@ -13,14 +14,16 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ServerManager {
     private final DatagramSocket serverSocket;
-    private final MulticastPublisher multicastPublisher;
-    private final List<ClientRef> clients = new CopyOnWriteArrayList<>();
-//    private static List<ServerRef> servers = new CopyOnWriteArrayList<>();
-    private static int serverPort = 9880;
+//    private final MulticastPublisher multicastPublisher;
+    private final List<Client> clients = new CopyOnWriteArrayList<>();
+    private final List<Room> rooms = new CopyOnWriteArrayList<>();
+    private final static int serverPort = 9880;
+    private static int multicastPort = 4446;
 
     public ServerManager() throws IOException {
         this.serverSocket = new DatagramSocket(this.serverPort);
-        this.multicastPublisher = new MulticastPublisher(this.serverSocket);
+//        this.multicastPublisher = new MulticastPublisher(this.serverSocket, this.multicastPort);
+        this.rooms.add(new Room("Principal", this.serverSocket, this.serverPort, this.multicastPort++));
 //        this.servers.add(new ServerRef(this.serverSocket, this.multicastPublisher, this.serverPort));
 //        this.serverPort++;
 //        multicastPublisher.sendMessage("terminate");
@@ -29,7 +32,7 @@ public class ServerManager {
 
     }
 
-    public void executeServer() throws IOException {
+    public void executeServer() throws IOException, InterruptedException {
         byte[] receiveData = new byte[1024];
 
         while (true) {
@@ -50,18 +53,20 @@ public class ServerManager {
                 continue;
             }
             switch (command) {
-                case CREATE_SERVER:
-                    this.createServer();
+                case CREATE_ROOM:
+                    this.createRoom(param, receivePacket.getAddress(), receivePacket.getPort());
                     break;
                 case CREATE_CLIENT:
                     this.createClient(param, receivePacket.getAddress(), receivePacket.getPort());
                     break;
-                case LST_SERVERS:
+                case LST_ROOMS:
+                    this.listRooms(receivePacket.getAddress(), receivePacket.getPort());
                     break;
                 case LST_CLIENTS:
                     this.listClientsOnline(receivePacket.getAddress(), receivePacket.getPort());
                     break;
-                case ENTER_SERVER:
+                case ENTER_ROOM:
+                    this.enterRoomByName(param, receivePacket.getAddress(), receivePacket.getPort());
                     break;
                 case PV:
                     this.sendPrivateMessage(message, param, receivePacket.getAddress(), receivePacket.getPort());
@@ -72,6 +77,8 @@ public class ServerManager {
                 case END:
                     this.endClientConnection(receivePacket.getAddress(), receivePacket.getPort());
                     break;
+                case CURRENT_ROOM:
+                    this.showCurrentRoom(receivePacket.getAddress(), receivePacket.getPort());
                 case BLOCK:
                     break;
                 case DEFAULT:
@@ -81,25 +88,37 @@ public class ServerManager {
         }
     }
 
-    private void createServer() throws IOException {
-//        ServerManager sm = new ServerManager();
-//        sm.executeServer();
+    private void createRoom(String name, InetAddress IPAddress, int port) throws IOException {
+        if (!this.verifyRoom(name, IPAddress, port)) return;
+        this.rooms.add(new Room(name.toLowerCase(), this.serverSocket, this.serverPort, this.multicastPort++));
+        this.sendMessage("Sala " + name + " criada com sucesso!", IPAddress, port);
     }
 
-    private void createClient(String name, InetAddress IPAddress, int port) throws IOException {
+    private void createClient(String name, InetAddress IPAddress, int port) throws IOException, InterruptedException {
         if (!this.verifyClient(name, IPAddress, port)) return;
-        ClientRef client = new ClientRef(name.toLowerCase(), IPAddress, port);
+        Client client = new Client(name.toLowerCase(), IPAddress, port, this.rooms.get(0).getMulticastPort());
         this.clients.add(client);
-        this.sendMessage("registered", IPAddress, port);
+//        this.sendMessage("created", IPAddress, port);
+        this.enterRoomByMulticastPort(client.getMulticastPort(), IPAddress, port);
         this.sendMessage("Servidor [privado]: Cliente registrado com sucesso! Para visualizar os comandos disponíveis digite ::help", IPAddress, port);
 
         // evnia mensagem de boas vindas para todos
+        Thread.sleep(100);
         String message = "Servidor [para todos]: O usuário " + name + " acabou de entrar no chat!";
-        this.multicastPublisher.multicast(message);
+        this.rooms.get(0).getMulticastPublisher().multicast(message);
+    }
+
+    private void listRooms(InetAddress IPAddress, int port) throws IOException {
+        StringBuilder sb = new StringBuilder("Servidor [privado]: Salas: [ ");
+        for (int i = 0; i < this.rooms.size(); i++) {
+            sb.append(this.rooms.get(i).getName()).append(i < this.rooms.size() -1 ? ", " : "");
+        }
+        sb.append(" ]");
+        this.sendMessage(sb.toString(), IPAddress, port);
     }
 
     private void listClientsOnline(InetAddress IPAddress, int port) throws IOException {
-        StringBuilder sb = new StringBuilder("Servidor [privado]:\nUsuários online: [ ");
+        StringBuilder sb = new StringBuilder("Servidor [privado]: Usuários online: [ ");
         for (int i = 0; i < this.clients.size(); i++) {
             sb.append(this.clients.get(i).getName()).append(i < this.clients.size() -1 ? ", " : "");
         }
@@ -107,9 +126,46 @@ public class ServerManager {
         this.sendMessage(sb.toString(), IPAddress, port);
     }
 
+    private void enterRoomByMulticastPort(int multicastPort, InetAddress IPAddress, int port) throws IOException {
+        Room room = this.getRoomByMulticastPort(multicastPort, IPAddress, port);
+        if (room == null) return;
+        for (Client client : this.clients) {
+            if (client.getPort() == port) {
+                client.setMulticastPort(room.getMulticastPort());
+            }
+        }
+        this.sendMessage("romm::"+multicastPort, IPAddress, port);
+    }
+
+    private void enterRoomByName(String roomName, InetAddress IPAddress, int port) throws IOException, InterruptedException {
+        Room room = this.getRoomByName(roomName, IPAddress, port, true);
+        if (room == null) return;
+        String clientName = "";
+        int oldMulticastPort = 0;
+        for (Client cli : this.clients) {
+            if (cli.getPort() == port) {
+                oldMulticastPort = cli.getMulticastPort();
+                cli.setMulticastPort(room.getMulticastPort());
+                clientName = cli.getName();
+            }
+        }
+        if (oldMulticastPort > 0) {
+            Room oldRoom = this.getRoomByMulticastPort(oldMulticastPort, IPAddress, port);
+            if (oldRoom == null) return;
+            // evnia mensagem de despedida para todos da sala antiga
+            oldRoom.getMulticastPublisher().multicast(clientName + " saiu do servidor. '-' ");
+        }
+        this.sendMessage("romm::"+room.getMulticastPort(), IPAddress, port);
+        // evnia mensagem de boas vindas para todos da sala nova
+        Thread.sleep(100);
+        String message = "Servidor [para todos]: O usuário " + clientName + " acabou de entrar no chat!";
+        room.getMulticastPublisher().multicast(message);
+
+    }
+
     public void sendPrivateMessage(String message, String receiverName, InetAddress IPAddress, int port) throws IOException {
-        ClientRef senderClient = this.getClientByPort(IPAddress, port);
-        ClientRef receiverClient = this.getClientByName(receiverName, IPAddress, port, true);
+        Client senderClient = this.getClientByPort(IPAddress, port);
+        Client receiverClient = this.getClientByName(receiverName, IPAddress, port, true);
         if (senderClient == null || receiverClient == null) return;
         String messageSender = "Você para " + receiverName + " [privado]: " + message;
         String messageReceiver =  senderClient.getName() + " [privado]: " + message;
@@ -122,22 +178,40 @@ public class ServerManager {
     }
 
     private void endClientConnection(InetAddress IPAddress, int port) throws IOException {
-        ClientRef client = this.getClientByPort(IPAddress, port);
+        Client client = this.getClientByPort(IPAddress, port);
+        Room room = this.getRoomByMulticastPort(client.getMulticastPort(), client.getIPAddress(), client.getPort());
+        if (room == null) return;
         this.clients.removeIf(cli -> cli.getPort() == port);
-        multicastPublisher.multicast(client.getName() + " saiu do servidor. '-' ");
+        room.getMulticastPublisher().multicast(client.getName() + " saiu do servidor. '-' ");
         this.sendMessage("end", client.getIPAddress(), client.getPort());
     }
 
-    private void sendDefaultMulticastMessage(String message, InetAddress IPAddress, int port) throws IOException {
-        ClientRef client = this.getClientByPort(IPAddress, port);
+    private void showCurrentRoom(InetAddress IPAddress, int port) throws IOException {
+        Client client = this.getClientByPort(IPAddress, port);
         if (client == null) return;
-        this.multicastPublisher.multicast(client.getName() + ": " + message);
+        Room room = this.getRoomByMulticastPort(client.getMulticastPort(), IPAddress, port);
+        if (room == null) return;
+        this.sendMessage("Servidor [privado]: Sua sala atual é " + room.getName(), IPAddress, port);
+    }
+
+    private void sendDefaultMulticastMessage(String message, InetAddress IPAddress, int port) throws IOException {
+        Client client = this.getClientByPort(IPAddress, port);
+        if (client == null) return;
+        Room room = this.getRoomByMulticastPort(client.getMulticastPort(), client.getIPAddress(), client.getPort());
+        if (room == null) return;
+        room.getMulticastPublisher().multicast(client.getName() + ": " + message);
     }
 
     private void sendMessage(String message, InetAddress IPAddress, int port) throws IOException {
         var buffer = message.getBytes();
         DatagramPacket datagram = new DatagramPacket(buffer, buffer.length, IPAddress, port);
-        serverSocket.send(datagram);
+        this.serverSocket.send(datagram);
+    }
+
+    private boolean verifyRoom(String name, InetAddress IPAddress, int port) throws IOException {
+        if (this.isEmpty(name, IPAddress, port, "Nome não informado! Por favor informe um nome para cadastrar uma sala.")) return false;
+        if (this.roomIsRegistered(name, IPAddress, port)) return false;
+        return true;
     }
 
     private boolean verifyClient(String name, InetAddress IPAddress, int port) throws IOException {
@@ -154,8 +228,17 @@ public class ServerManager {
         return false;
     }
 
+    private boolean roomIsRegistered(String name, InetAddress IPAddress, int port) throws IOException {
+        Room room = this.getRoomByName(name, IPAddress, port, false);
+        if (room != null) {
+            this.sendMessage("Servidor [privado]: Já existe uma sala cadastrada com este nome, por favor utilize um outro nome.", IPAddress, port);
+            return true;
+        }
+        return false;
+    }
+
     private boolean clientIsRegistered(String name, InetAddress IPAddress, int port) throws IOException {
-        ClientRef client = this.getClientByName(name, IPAddress, port, false);
+        Client client = this.getClientByName(name, IPAddress, port, false);
         if (client != null) {
             this.sendMessage("Servidor [privado]: Já existe um cliente cadastrado com este nome, por favor utilize um outro nome.", IPAddress, port);
             return true;
@@ -163,23 +246,43 @@ public class ServerManager {
         return false;
     }
 
-    private ClientRef getClientByPort(InetAddress IPAddress, int port) throws IOException {
-        Optional<ClientRef> clientOpt = this.clients.stream().filter(cli -> cli.getPort() == port).findFirst();
+    private Room getRoomByMulticastPort(int multicastPort, InetAddress IPAddress, int port) throws IOException {
+        Optional<Room> roomOpt = this.rooms.stream().filter(room -> room.getMulticastPort() == multicastPort).findFirst();
+        if (roomOpt.isEmpty()) {
+            this.sendMessage("Servidor [privado]: Sala  não encontrada!", IPAddress, port);
+            return null;
+        }
+        Room room = roomOpt.get();
+        return room;
+    }
+
+    private Room getRoomByName(String name, InetAddress IPAddress, int port, boolean showWarning) throws IOException {
+        Optional<Room> roomOpt = this.rooms.stream().filter(room -> room.getName().equals(name.toLowerCase())).findFirst();
+        if (roomOpt.isEmpty()) {
+            if (showWarning) this.sendMessage("Servidor [privado]: Sala  não encontrada!", IPAddress, port);
+            return null;
+        }
+        Room room = roomOpt.get();
+        return room;
+    }
+
+    private Client getClientByPort(InetAddress IPAddress, int port) throws IOException {
+        Optional<Client> clientOpt = this.clients.stream().filter(cli -> cli.getPort() == port).findFirst();
         if (clientOpt.isEmpty()) {
             this.sendMessage("Servidor [privado]: Cliente não encontrado!", IPAddress, port);
             return null;
         }
-        ClientRef client = clientOpt.get();
+        Client client = clientOpt.get();
         return client;
     }
 
-    private ClientRef getClientByName(String name, InetAddress IPAddress, int port, boolean showWarning) throws IOException {
-        Optional<ClientRef> clientOpt = this.clients.stream().filter(cli -> cli.getName().equals(name.toLowerCase())).findFirst();
+    private Client getClientByName(String name, InetAddress IPAddress, int port, boolean showWarning) throws IOException {
+        Optional<Client> clientOpt = this.clients.stream().filter(cli -> cli.getName().equals(name.toLowerCase())).findFirst();
         if (clientOpt.isEmpty()) {
             if (showWarning) this.sendMessage("Servidor [privado]: Cliente não encontrado!", IPAddress, port);
             return null;
         }
-        ClientRef client = clientOpt.get();
+        Client client = clientOpt.get();
         return client;
     }
 

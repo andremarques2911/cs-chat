@@ -5,12 +5,17 @@ import java.net.InetAddress;
 import java.net.MulticastSocket;
 
 public class MulticastReceiver extends Thread {
+    private int port;
     protected MulticastSocket socket = null;
     protected byte[] buf = new byte[256];
 
+    public MulticastReceiver(int port) {
+        this.port = port;
+    }
+
     public void run() {
         try {
-            socket = new MulticastSocket(4446);
+            socket = new MulticastSocket(this.port);
             InetAddress group = InetAddress.getByName("230.0.0.0");
             socket.joinGroup(group);
             while (true) {

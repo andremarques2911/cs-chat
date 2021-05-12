@@ -2,15 +2,17 @@ package server;
 
 import java.net.InetAddress;
 
-public class ClientRef {
+public class Client {
     private String name;
     private InetAddress IPAddress;
     private int port;
+    private int multicastPort;
 
-    public ClientRef(String name, InetAddress IPAddress, int port) {
+    public Client(String name, InetAddress IPAddress, int port, int multicastPort) {
         this.name = name;
         this.IPAddress = IPAddress;
         this.port = port;
+        this.multicastPort = multicastPort;
     }
 
     public String getName() {
@@ -35,5 +37,13 @@ public class ClientRef {
 
     public void setPort(int port) {
         this.port = port;
+    }
+
+    public int getMulticastPort() {
+        return multicastPort;
+    }
+
+    public void setMulticastPort(int multicastPort) {
+        this.multicastPort = multicastPort;
     }
 }
