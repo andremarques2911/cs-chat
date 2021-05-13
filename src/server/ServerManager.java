@@ -17,6 +17,7 @@ public class ServerManager {
 //    private final MulticastPublisher multicastPublisher;
     private final List<Client> clients = new CopyOnWriteArrayList<>();
     private final List<Room> rooms = new CopyOnWriteArrayList<>();
+    private final int MAX_BUF = 65000;
     private final static int serverPort = 9880;
     private static int multicastPort = 4446;
 
@@ -33,7 +34,7 @@ public class ServerManager {
     }
 
     public void executeServer() throws IOException, InterruptedException {
-        byte[] receiveData = new byte[1024];
+        byte[] receiveData = new byte[MAX_BUF];
 
         while (true) {
             // declara o pacote a ser recebido
@@ -81,7 +82,7 @@ public class ServerManager {
                     this.showCurrentRoom(receivePacket.getAddress(), receivePacket.getPort());
                     break;
                 case IMG:
-                    this.sendImageToRoom(param, receivePacket.getAddress(), receivePacket.getPort());
+                    this.sendImageToRoom(receivePacket.getData(), receivePacket.getAddress(), receivePacket.getPort());
                 case BLOCK:
                     break;
                 case DEFAULT:
@@ -177,7 +178,17 @@ public class ServerManager {
     }
 
     private void listCommands(InetAddress IPAddress, int port) throws IOException {
-        this.sendMessage(Arrays.toString(Commands.values()), IPAddress, port);
+        StringBuilder sb = new StringBuilder("LISTA DE COMANDOS: \n\n");
+        sb.append("CREATE_ROOM [name] – cria uma room;\n");
+        sb.append("CREATE_CLIENT [name] – criar  usuário;\n");
+        sb.append("LST_ROOMS – lista os rooms do server;\n");
+        sb.append("ENTER_ROOM [name] – entra na room;\n");
+        sb.append(" PV [receiver] [message] – manda mensagem privada;\n");
+        sb.append("CURRENT_ROOM – lista room atual;\n");
+        sb.append("HELP – lista os comandos;\n");
+        sb.append("END – encerra participação do usuário no servidor;\n");
+        sb.append("IMG [path] – envia imagem;\n");
+        this.sendMessage(sb.toString(), IPAddress, port);
     }
 
     private void endClientConnection(InetAddress IPAddress, int port) throws IOException {
@@ -197,12 +208,12 @@ public class ServerManager {
         this.sendMessage("Servidor [privado]: Sua sala atual é " + room.getName(), IPAddress, port);
     }
 
-    private void sendImageToRoom(String message, InetAddress IPAddress, int port) throws IOException {
+    private void sendImageToRoom(byte[] data, InetAddress IPAddress, int port) throws IOException {
         Client client = this.getClientByPort(IPAddress, port);
         if (client == null) return;
         Room room = this.getRoomByMulticastPort(client.getMulticastPort(), client.getIPAddress(), client.getPort());
         if (room == null) return;
-        room.getMulticastPublisher().multicast("::img " + message);
+        room.getMulticastPublisher().multicast(data);
     }
 
     private void sendDefaultMulticastMessage(String message, InetAddress IPAddress, int port) throws IOException {

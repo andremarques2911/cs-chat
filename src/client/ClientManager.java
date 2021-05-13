@@ -1,8 +1,8 @@
 package client;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import utils.Utils;
+
+import java.io.*;
 import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -49,7 +49,7 @@ public class ClientManager {
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, 9880);
 
             //envia o pacote
-            clientSocket.send(sendPacket);
+            this.clientSocket.send(sendPacket);
         }
     }
 

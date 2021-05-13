@@ -1,5 +1,7 @@
 package server;
 
+import utils.Utils;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -23,4 +25,11 @@ public class MulticastPublisher {
         DatagramPacket packet = new DatagramPacket(buf, buf.length, group, this.port);
         socket.send(packet);
     }
+
+    public void multicast(byte[] data) throws IOException {
+        group = InetAddress.getByName("230.0.0.0");
+        DatagramPacket packet = new DatagramPacket(data, data.length, group, this.port);
+        socket.send(packet);
+    }
+
 }
