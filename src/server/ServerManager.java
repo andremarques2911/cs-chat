@@ -7,14 +7,12 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ServerManager {
     private final DatagramSocket serverSocket;
-//    private final MulticastPublisher multicastPublisher;
     private final List<Client> clients = new CopyOnWriteArrayList<>();
     private final List<Room> rooms = new CopyOnWriteArrayList<>();
     private final int MAX_BUF = 65000;
@@ -23,14 +21,7 @@ public class ServerManager {
 
     public ServerManager() throws IOException {
         this.serverSocket = new DatagramSocket(this.serverPort);
-//        this.multicastPublisher = new MulticastPublisher(this.serverSocket, this.multicastPort);
         this.rooms.add(new Room("Principal", this.serverSocket, this.serverPort, this.multicastPort++));
-//        this.servers.add(new ServerRef(this.serverSocket, this.multicastPublisher, this.serverPort));
-//        this.serverPort++;
-//        multicastPublisher.sendMessage("terminate");
-//        new KeepAliveManager(clients, this).start();
-//        new KeepAliveReceiver(clients, KEEP_ALIVE_PORT).start();
-
     }
 
     public void executeServer() throws IOException, InterruptedException {
@@ -74,7 +65,6 @@ public class ServerManager {
                     break;
                 case HELP:
                     this.listCommands(receivePacket.getAddress(), receivePacket.getPort());
-
                     break;
                 case END:
                     this.endClientConnection(receivePacket.getAddress(), receivePacket.getPort());
@@ -103,7 +93,6 @@ public class ServerManager {
         if (!this.verifyClient(name, IPAddress, port)) return;
         Client client = new Client(name.toLowerCase(), IPAddress, port, this.rooms.get(0).getMulticastPort());
         this.clients.add(client);
-//        this.sendMessage("created", IPAddress, port);
         this.enterRoomByMulticastPort(client.getMulticastPort(), IPAddress, port);
         this.sendMessage("Servidor [privado]: Cliente registrado com sucesso! Para visualizar os comandos disponíveis digite ::help", IPAddress, port);
 

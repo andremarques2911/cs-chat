@@ -18,7 +18,7 @@ public class MulticastPublisher {
         this.port = port;
     }
 
-    // enviar pacotes para o cliente
+    // enviar pacotes para o receiver da sala
     public void multicast(String multicastMessage) throws IOException {
         group = InetAddress.getByName("230.0.0.0");
         buf = multicastMessage.getBytes();
@@ -26,6 +26,7 @@ public class MulticastPublisher {
         socket.send(packet);
     }
 
+    // envia bytes da imagem para o receiver da sala
     public void multicast(byte[] data) throws IOException {
         group = InetAddress.getByName("230.0.0.0");
         DatagramPacket packet = new DatagramPacket(data, data.length, group, this.port);
